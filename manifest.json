@@ -1,1 +1,13 @@
 
+{
+  "name": "X Downloader",
+  "short_name": "X下载器",
+  "description": "Twitter和X公开媒体解析工具",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#101522",
+  "theme_color": "#101522"
+}
+
