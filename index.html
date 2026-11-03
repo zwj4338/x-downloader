@@ -1,1 +1,206 @@
 
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#111827">
+<title>X Downloader</title>
+<link rel="manifest" href="manifest.json">
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:#101522;color:white;
+ font-family:Arial,sans-serif;
+ min-height:100vh;padding:24px 16px;
+}
+.container{max-width:520px;margin:auto}
+header{text-align:center;margin:35px 0}
+.logo{font-size:42px}
+h1{font-size:28px;margin:10px}
+.sub{color:#9ca3af;font-size:14px}
+.panel{
+ background:#1c2638;border-radius:18px;
+ padding:20px;margin-top:22px;
+}
+input{
+ width:100%;padding:16px;border-radius:12px;
+ border:1px solid #3b4659;background:#101522;
+ color:white;font-size:15px;outline:none;
+}
+button{
+ width:100%;padding:15px;border:0;
+ border-radius:12px;font-size:16px;
+ font-weight:bold;cursor:pointer;
+ background:#7564ee;color:white;
+ margin-top:14px;
+}
+button:disabled{opacity:.5}
+#status{color:#c4b5fd;margin-top:15px;font-size:14px}
+.item{
+ background:#263248;border-radius:12px;
+ padding:12px;margin-top:15px;
+}
+.item img,.item video{
+ width:100%;border-radius:10px;
+}
+.item a{color:#c4b5fd;display:inline-block;margin-top:10px}
+.small{color:#9ca3af;font-size:12px}
+footer{text-align:center;color:#697386;margin-top:35px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<div class="logo">𝕏 ↓</div>
+<h1>X Downloader</h1>
+<div class="sub">Twitter / X 图片和视频解析工具</div>
+</header>
+
+<div class="panel">
+<h3>粘贴推文链接</h3>
+<input id="tweetUrl"
+ placeholder="https://x.com/user/status/123456789">
+<button id="parseBtn" onclick="parseTweet()">开始解析</button>
+<div id="status">支持公开推文链接</div>
+</div>
+
+<div id="results"></div>
+
+<div class="panel">
+<h3>最近解析</h3>
+<div id="history" class="small">暂无历史记录</div>
+</div>
+
+<footer>
+仅用于下载自己拥有或获准使用的媒体内容
+</footer>
+</div>
+
+<script>
+const API_URL = "替换成你的Cloudflare接口地址";
+
+const input=document.getElementById("tweetUrl");
+const statusBox=document.getElementById("status");
+const results=document.getElementById("results");
+const btn=document.getElementById("parseBtn");
+
+function getTweetId(url){
+ const match=url.match(/status\/(\d+)/);
+ return match ? match[1] : null;
+}
+
+async function parseTweet(){
+ const url=input.value.trim();
+ const id=getTweetId(url);
+
+ results.innerHTML="";
+
+ if(!id){
+  statusBox.textContent="请输入正确的 X 推文链接";
+  return;
+ }
+
+ if(API_URL.startsWith("替换")){
+  statusBox.textContent="请先配置解析接口";
+  return;
+ }
+
+ btn.disabled=true;
+ statusBox.textContent="正在解析，请稍候...";
+
+ try{
+  const response=await fetch(
+   API_URL+"?id="+encodeURIComponent(id)
+  );
+  const data=await response.json();
+
+  if(!response.ok) throw new Error(data.error||"解析失败");
+
+  if(!data.media || data.media.length===0){
+   throw new Error("没有找到可用的媒体文件");
+  }
+
+  data.media.forEach((item,index)=>{
+   const card=document.createElement("div");
+   card.className="item";
+
+   const title=document.createElement("h4");
+   title.textContent=item.type==="video"?"视频 "+(index+1):"图片 "+(index+1);
+   card.appendChild(title);
+
+   if(item.type==="video"){
+    const video=document.createElement("video");
+    video.src=item.url;
+    video.controls=true;
+    video.playsInline=true;
+    card.appendChild(video);
+   }else{
+    const img=document.createElement("img");
+    img.src=item.url;
+    img.alt="推文图片";
+    img.loading="lazy";
+    card.appendChild(img);
+   }
+
+   const link=document.createElement("a");
+   link.href=item.url;
+   link.target="_blank";
+   link.rel="noopener noreferrer";
+   link.textContent="打开 / 下载媒体";
+   card.appendChild(link);
+
+   results.appendChild(card);
+  });
+
+  statusBox.textContent="解析成功，共找到 "+data.media.length+" 个媒体文件";
+  saveHistory(url);
+
+ }catch(error){
+  statusBox.textContent="解析失败："+error.message;
+ }finally{
+  btn.disabled=false;
+ }
+}
+
+function saveHistory(url){
+ let list=JSON.parse(localStorage.getItem("xHistory")||"[]");
+ list=[url,...list.filter(x=>x!==url)].slice(0,8);
+ localStorage.setItem("xHistory",JSON.stringify(list));
+ showHistory();
+}
+
+function showHistory(){
+ const list=JSON.parse(localStorage.getItem("xHistory")||"[]");
+ const box=document.getElementById("history");
+ box.innerHTML="";
+ if(!list.length){
+  box.textContent="暂无历史记录";
+  return;
+ }
+ list.forEach(url=>{
+  const row=document.createElement("div");
+  row.className="item";
+  const a=document.createElement("a");
+  a.href="#";
+  a.textContent=url;
+  a.onclick=e=>{
+   e.preventDefault();
+   input.value=url;
+   parseTweet();
+  };
+  row.appendChild(a);
+  box.appendChild(row);
+ });
+}
+showHistory();
+
+if("serviceWorker" in navigator){
+ window.addEventListener("load",()=>{
+  navigator.serviceWorker.register("./sw.js").catch(console.error);
+ });
+}
+</script>
+</body>
+</html>
+
