@@ -7,6 +7,7 @@
 <meta name="theme-color" content="#111827">
 <title>X Downloader</title>
 <link rel="manifest" href="manifest.json">
+
 <style>
 *{box-sizing:border-box}
 body{
@@ -43,14 +44,18 @@ button:disabled{opacity:.5}
 }
 .item img,.item video{
  width:100%;border-radius:10px;
+ display:block;
 }
+.item video{background:#000}
 .item a{color:#c4b5fd;display:inline-block;margin-top:10px}
 .small{color:#9ca3af;font-size:12px}
 footer{text-align:center;color:#697386;margin-top:35px;font-size:12px}
 </style>
 </head>
+
 <body>
 <div class="container">
+
 <header>
 <div class="logo">𝕏 ↓</div>
 <h1>X Downloader</h1>
@@ -75,124 +80,159 @@ footer{text-align:center;color:#697386;margin-top:35px;font-size:12px}
 <footer>
 仅用于下载自己拥有或获准使用的媒体内容
 </footer>
+
 </div>
 
 <script>
 const API_URL = "https://x-media-api.zwj4338.workers.dev";
 
-const input=document.getElementById("tweetUrl");
-const statusBox=document.getElementById("status");
-const results=document.getElementById("results");
-const btn=document.getElementById("parseBtn");
+const input = document.getElementById("tweetUrl");
+const statusBox = document.getElementById("status");
+const results = document.getElementById("results");
+const btn = document.getElementById("parseBtn");
 
 function getTweetId(url){
- const match=url.match(/status\/(\d+)/);
+ const match = url.match(/status\/(\d+)/);
  return match ? match[1] : null;
 }
 
 async function parseTweet(){
- const url=input.value.trim();
- const id=getTweetId(url);
+ const url = input.value.trim();
+ const id = getTweetId(url);
 
- results.innerHTML="";
+ results.innerHTML = "";
 
  if(!id){
-  statusBox.textContent="请输入正确的 X 推文链接";
+  statusBox.textContent = "请输入正确的 X 推文链接";
   return;
  }
 
- if(API_URL.startsWith("替换")){
-  statusBox.textContent="请先配置解析接口";
-  return;
- }
-
- btn.disabled=true;
- statusBox.textContent="正在解析，请稍候...";
+ btn.disabled = true;
+ statusBox.textContent = "正在解析，请稍候...";
 
  try{
-  const response=await fetch(
-   API_URL+"?id="+encodeURIComponent(id)
+  const response = await fetch(
+   API_URL + "?id=" + encodeURIComponent(id)
   );
-  const data=await response.json();
 
-  if(!response.ok) throw new Error(data.error||"解析失败");
+  const data = await response.json();
 
-  if(!data.media || data.media.length===0){
+  if(!response.ok){
+   throw new Error(data.error || "解析失败");
+  }
+
+  if(!data.media || data.media.length === 0){
    throw new Error("没有找到可用的媒体文件");
   }
 
   data.media.forEach((item,index)=>{
-   const card=document.createElement("div");
-   card.className="item";
+   const card = document.createElement("div");
+   card.className = "item";
 
-   const title=document.createElement("h4");
-   title.textContent=item.type==="video"?"视频 "+(index+1):"图片 "+(index+1);
+   const title = document.createElement("h4");
+   title.textContent = item.type === "video"
+    ? "视频 " + (index+1)
+    : "图片 " + (index+1);
+
    card.appendChild(title);
 
-   if(item.type==="video"){
-    const video=document.createElement("video");
-    video.src=item.url;
-    video.controls=true;
-    video.playsInline=true;
+   if(item.type === "video"){
+    const video = document.createElement("video");
+
+    // 视频地址
+    video.src = item.url;
+
+    // 视频封面地址
+    if(item.thumbnail){
+     video.poster = item.thumbnail;
+    }
+
+    // 播放器设置
+    video.controls = true;
+    video.playsInline = true;
+    video.preload = "metadata";
+
+    video.style.width = "100%";
+    video.style.display = "block";
+    video.style.borderRadius = "10px";
+    video.style.background = "#000";
+
+    video.addEventListener("error",()=>{
+     const tip = document.createElement("p");
+     tip.className = "small";
+     tip.textContent = "视频加载失败，请检查视频链接或网络";
+     card.appendChild(tip);
+    });
+
     card.appendChild(video);
+
    }else{
-    const img=document.createElement("img");
-    img.src=item.url;
-    img.alt="推文图片";
-    img.loading="lazy";
+    const img = document.createElement("img");
+    img.src = item.url;
+    img.alt = "推文图片";
+    img.loading = "lazy";
     card.appendChild(img);
    }
 
-   const link=document.createElement("a");
-   link.href=item.url;
-   link.target="_blank";
-   link.rel="noopener noreferrer";
-   link.textContent="打开 / 下载媒体";
-   card.appendChild(link);
+   const link = document.createElement("a");
+   link.href = item.url;
+   link.target = "_blank";
+   link.rel = "noopener noreferrer";
+   link.textContent = "打开 / 下载媒体";
 
+   card.appendChild(link);
    results.appendChild(card);
   });
 
-  statusBox.textContent="解析成功，共找到 "+data.media.length+" 个媒体文件";
+  statusBox.textContent =
+   "解析成功，共找到 " + data.media.length + " 个媒体文件";
+
   saveHistory(url);
 
  }catch(error){
-  statusBox.textContent="解析失败："+error.message;
+  statusBox.textContent = "解析失败：" + error.message;
  }finally{
-  btn.disabled=false;
+  btn.disabled = false;
  }
 }
 
 function saveHistory(url){
- let list=JSON.parse(localStorage.getItem("xHistory")||"[]");
- list=[url,...list.filter(x=>x!==url)].slice(0,8);
+ let list = JSON.parse(localStorage.getItem("xHistory") || "[]");
+ list = [url,...list.filter(x=>x!==url)].slice(0,8);
  localStorage.setItem("xHistory",JSON.stringify(list));
  showHistory();
 }
 
 function showHistory(){
- const list=JSON.parse(localStorage.getItem("xHistory")||"[]");
- const box=document.getElementById("history");
- box.innerHTML="";
+ const list = JSON.parse(localStorage.getItem("xHistory") || "[]");
+ const box = document.getElementById("history");
+
+ box.innerHTML = "";
+
  if(!list.length){
-  box.textContent="暂无历史记录";
+  box.textContent = "暂无历史记录";
   return;
  }
+
  list.forEach(url=>{
-  const row=document.createElement("div");
-  row.className="item";
-  const a=document.createElement("a");
-  a.href="#";
-  a.textContent=url;
-  a.onclick=e=>{
+  const row = document.createElement("div");
+  row.className = "item";
+
+  const a = document.createElement("a");
+  a.href = "#";
+  a.textContent = url;
+
+  a.onclick = e=>{
    e.preventDefault();
-   input.value=url;
+   input.value = url;
    parseTweet();
   };
+
   row.appendChild(a);
   box.appendChild(row);
  });
 }
+
 showHistory();
 
 if("serviceWorker" in navigator){
@@ -203,4 +243,3 @@ if("serviceWorker" in navigator){
 </script>
 </body>
 </html>
-
