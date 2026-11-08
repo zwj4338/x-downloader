@@ -652,6 +652,139 @@ showHistory();
 </script>
 </body>
 </html>
+败："+error.message;
+
+ }finally{
+  btn.disabled=false;
+ }
+}
+
+// 保存历史
+function saveHistory(url){
+
+ let list=JSON.parse(
+  localStorage.getItem("xHistory")||"[]"
+ );
+
+ list=[
+  url,
+  ...list.filter(x=>x!==url)
+ ].slice(0,8);
+
+ localStorage.setItem("xHistory",JSON.stringify(list));
+ showHistory();
+}
+
+// 单条删除：二次确认
+function deleteHistory(index){
+
+ const current=JSON.parse(
+  localStorage.getItem("xHistory")||"[]"
+ );
+
+ if(index<0||index>=current.length)return;
+
+ if(!confirm(
+  "第一次确认：确定要删除这条解析记录吗？"
+ )){
+  return;
+ }
+
+ if(!confirm(
+  "第二次确认：删除后无法恢复，真的要删除吗？"
+ )){
+  return;
+ }
+
+ current.splice(index,1);
+
+ localStorage.setItem(
+  "xHistory",
+  JSON.stringify(current)
+ );
+
+ showHistory();
+
+ alert("这条解析记录已删除！");
+}
+
+// 显示历史记录
+function showHistory(){
+
+ const list=JSON.parse(
+  localStorage.getItem("xHistory")||"[]"
+ );
+
+ const box=document.getElementById("history");
+ box.innerHTML="";
+
+ if(!list.length){
+  box.textContent="暂无历史记录";
+  return;
+ }
+
+ list.forEach((url,index)=>{
+
+  const row=document.createElement("div");
+  row.className="item history-row";
+
+  const a=document.createElement("a");
+  a.href="#";
+  a.className="action";
+  a.textContent=url;
+
+  a.onclick=e=>{
+   e.preventDefault();
+   input.value=url;
+   parseTweet();
+  };
+
+  const del=document.createElement("button");
+  del.className="delete-btn";
+  del.textContent="删除";
+
+  del.onclick=()=>{
+   deleteHistory(index);
+  };
+
+  row.appendChild(a);
+  row.appendChild(del);
+  box.appendChild(row);
+ });
+
+ // 清空全部历史
+ const clear=document.createElement("button");
+ clear.className="clear-history";
+ clear.textContent="清空全部历史";
+
+ clear.onclick=()=>{
+
+  if(!confirm(
+   "第一次确认：确定要删除全部解析记录吗？"
+  )){
+   return;
+  }
+
+  if(!confirm(
+   "第二次确认：删除后无法恢复，真的要全部清空吗？"
+  )){
+   return;
+  }
+
+  localStorage.removeItem("xHistory");
+
+  showHistory();
+
+  alert("全部解析记录已清空！");
+ };
+
+ box.appendChild(clear);
+}
+
+showHistory();
+</script>
+</body>
+</html>
 ();
 }
 
