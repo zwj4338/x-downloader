@@ -117,37 +117,16 @@ button:disabled{opacity:.5}
  margin-left:6px;
 }
 
-/* 贴文展开和收起 */
-.tweet-text{
- white-space:pre-wrap;
- overflow-wrap:anywhere;
- line-height:1.7;
- font-size:14px;
- color:#e5e7eb;
-}
-.tweet-text.collapsed{
- display:-webkit-box;
- -webkit-box-orient:vertical;
- -webkit-line-clamp:4;
- line-clamp:4;
- overflow:hidden;
-}
-.tweet-toggle{
- display:inline-block;
- width:auto;
- padding:7px 12px;
- margin-top:10px;
- background:#35445e;
- color:#c4b5fd;
- font-size:13px;
-}
-
+/* 最近解析布局 */
 .history-row{
  display:flex;
- align-items:center;
- gap:8px;
+ align-items:flex-start;
+ gap:9px;
 }
-.history-info{flex:1;min-width:0}
+.history-info{
+ flex:1;
+ min-width:0;
+}
 .history-author{
  font-weight:bold;
  font-size:15px;
@@ -159,20 +138,41 @@ button:disabled{opacity:.5}
  margin-top:5px;
 }
 .history-url{
- color:#9ca3af;
+ color:#8993a5;
  font-size:11px;
- margin-top:6px;
+ margin-top:7px;
  overflow-wrap:anywhere;
+}
+.history-text{
+ color:#e5e7eb;
+ font-size:13px;
+ line-height:1.65;
+ white-space:pre-wrap;
+ overflow-wrap:anywhere;
+ margin-top:12px;
+}
+.history-text.collapsed{
+ max-height:6.6em;
+ overflow:hidden;
+}
+.history-toggle{
+ display:inline-block;
+ width:auto;
+ padding:7px 11px;
+ margin-top:7px;
+ background:#35445e;
+ color:#c4b5fd;
+ font-size:12px;
 }
 .history-open{
  background:#35445e;
- padding:9px;
- margin-top:9px;
+ padding:10px;
+ margin-top:10px;
  font-size:13px;
 }
 .delete-btn{
  width:auto;
- min-width:64px;
+ min-width:60px;
  padding:10px;
  margin:0;
  background:#a33d50;
@@ -469,40 +469,34 @@ function createImageCard(card,item){
  );
 }
 
-// 贴文内容：默认折叠，点击展开或收起
-function createTweetText(container,text){
+// 创建可展开的正文
+function createExpandableText(container,text){
 
  if(!text)return;
 
  const textBox=document.createElement("div");
- textBox.className="tweet-text collapsed";
+ textBox.className="history-text";
  textBox.textContent=text;
 
  container.appendChild(textBox);
 
- // 先临时显示完整内容，判断是否真的超过四行
- textBox.classList.remove("collapsed");
+ // 短文本不显示展开按钮
+ if(text.length<=100){
+  return;
+ }
 
- requestAnimationFrame(()=>{
-  const isLong=textBox.scrollHeight>textBox.clientHeight+2;
+ textBox.classList.add("collapsed");
 
-  if(!isLong){
-   return;
-  }
+ const toggle=document.createElement("button");
+ toggle.className="history-toggle";
+ toggle.textContent="展开全文 ↓";
 
-  textBox.classList.add("collapsed");
+ toggle.onclick=()=>{
+  const collapsed=textBox.classList.toggle("collapsed");
+  toggle.textContent=collapsed?"展开全文 ↓":"收起 ↑";
+ };
 
-  const toggle=document.createElement("button");
-  toggle.className="tweet-toggle";
-  toggle.textContent="展开全文 ↓";
-
-  toggle.onclick=()=>{
-   const collapsed=textBox.classList.toggle("collapsed");
-   toggle.textContent=collapsed?"展开全文 ↓":"收起 ↑";
-  };
-
-  container.appendChild(toggle);
- });
+ container.appendChild(toggle);
 }
 
 // 开始解析
@@ -553,7 +547,12 @@ async function parseTweet(){
    contentTitle.textContent="贴文内容";
    info.appendChild(contentTitle);
 
-   createTweetText(info,data.text);
+   const content=document.createElement("div");
+   content.className="tweet-text";
+   content.style.whiteSpace="pre-wrap";
+   content.style.lineHeight="1.7";
+   content.textContent=data.text;
+   info.appendChild(content);
   }
 
   results.appendChild(info);
@@ -585,10 +584,12 @@ async function parseTweet(){
   statusBox.textContent=
    "解析成功，共找到 "+data.media.length+" 个媒体文件";
 
+  // 把作者、用户名、正文一起保存
   saveHistory(
    url,
    data.author||"未知作者",
-   data.username||""
+   data.username||"",
+   data.text||""
   );
 
  }catch(error){
@@ -601,7 +602,7 @@ async function parseTweet(){
 }
 
 // 保存历史记录，兼容旧版记录
-function saveHistory(url,author,username){
+function saveHistory(url,author,username,text){
 
  let list=JSON.parse(
   localStorage.getItem("xHistory")||"[]"
@@ -609,13 +610,23 @@ function saveHistory(url,author,username){
 
  list=list.map(item=>{
   if(typeof item==="string"){
-   return {url:item,author:"",username:""};
+   return {
+    url:item,
+    author:"",
+    username:"",
+    text:""
+   };
   }
   return item;
  });
 
  list=[
-  {url,author,username},
+  {
+   url:url,
+   author:author,
+   username:username,
+   text:text
+  },
   ...list.filter(item=>item.url!==url)
  ].slice(0,8);
 
@@ -660,16 +671,22 @@ function deleteHistory(index){
  alert("这条解析记录已删除！");
 }
 
-// 显示历史记录
+// 显示最近解析
 function showHistory(){
 
  let list=JSON.parse(
   localStorage.getItem("xHistory")||"[]"
  );
 
+ // 兼容以前只保存链接的旧记录
  list=list.map(item=>{
   if(typeof item==="string"){
-   return {url:item,author:"",username:""};
+   return {
+    url:item,
+    author:"",
+    username:"",
+    text:""
+   };
   }
   return item;
  });
@@ -690,20 +707,38 @@ function showHistory(){
   const info=document.createElement("div");
   info.className="history-info";
 
+  // 作者名称
   const author=document.createElement("div");
   author.className="history-author";
   author.textContent=item.author||"作者信息未记录";
 
+  // 作者用户名
   const username=document.createElement("div");
   username.className="history-username";
   username.textContent=item.username
    ?"@"+item.username
    :"暂无作者 ID";
 
+  // 正文
+  info.appendChild(author);
+  info.appendChild(username);
+
+  if(item.text){
+   createExpandableText(info,item.text);
+  }else{
+   const noText=document.createElement("div");
+   noText.className="history-text";
+   noText.textContent="暂无贴文内容，重新解析后可以保存正文";
+   info.appendChild(noText);
+  }
+
+  // 原始链接
   const url=document.createElement("div");
   url.className="history-url";
   url.textContent=item.url;
+  info.appendChild(url);
 
+  // 重新解析按钮
   const open=document.createElement("button");
   open.className="history-open";
   open.textContent="重新解析";
@@ -711,13 +746,12 @@ function showHistory(){
   open.onclick=()=>{
    input.value=item.url;
    parseTweet();
+   window.scrollTo({top:0,behavior:"smooth"});
   };
 
-  info.appendChild(author);
-  info.appendChild(username);
-  info.appendChild(url);
   info.appendChild(open);
 
+  // 删除按钮
   const del=document.createElement("button");
   del.className="delete-btn";
   del.textContent="删除";
@@ -728,6 +762,7 @@ function showHistory(){
 
   row.appendChild(info);
   row.appendChild(del);
+
   box.appendChild(row);
  });
 
