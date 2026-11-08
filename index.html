@@ -5,8 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#111827">
-<title>X Downloader</title>
-<link rel="manifest" href="manifest.json">
+<title>X媒体助手</title>
 
 <style>
 *{box-sizing:border-box}
@@ -47,14 +46,19 @@ button:disabled{opacity:.5}
  width:100%;border-radius:10px;
  display:block;
 }
-.item video{
- background:#000;
- margin-top:10px;
-}
+.item video{background:#000;margin-top:10px}
 .item a{
  color:#c4b5fd;display:inline-block;
- margin-top:10px;word-break:break-all;
+ margin-top:12px;word-break:break-all;
 }
+.action{
+ display:block;text-align:center;
+ text-decoration:none;border-radius:10px;
+ padding:13px;margin-top:12px;
+ background:#7564ee;color:white!important;
+ font-weight:bold;
+}
+.download{background:#35445e}
 .small{color:#9ca3af;font-size:12px}
 .error{color:#fca5a5;font-size:13px}
 footer{text-align:center;color:#697386;margin-top:35px;font-size:12px}
@@ -66,7 +70,7 @@ footer{text-align:center;color:#697386;margin-top:35px;font-size:12px}
 
 <header>
 <div class="logo">𝕏 ↓</div>
-<h1>X Downloader</h1>
+<h1>X 媒体助手</h1>
 <div class="sub">Twitter / X 图片和视频解析工具</div>
 </header>
 
@@ -85,39 +89,112 @@ footer{text-align:center;color:#697386;margin-top:35px;font-size:12px}
 <div id="history" class="small">暂无历史记录</div>
 </div>
 
-<footer>
-仅用于下载自己拥有或获准使用的媒体内容
-</footer>
+<footer>仅用于下载自己拥有或获准使用的媒体内容</footer>
 
 </div>
 
 <script>
-const API_URL = "https://x-media-api.zwj4338.workers.dev";
+const API_URL="https://x-media-api.zwj4338.workers.dev";
 
-const input = document.getElementById("tweetUrl");
-const statusBox = document.getElementById("status");
-const results = document.getElementById("results");
-const btn = document.getElementById("parseBtn");
+const input=document.getElementById("tweetUrl");
+const statusBox=document.getElementById("status");
+const results=document.getElementById("results");
+const btn=document.getElementById("parseBtn");
 
 function getTweetId(url){
- const match = url.match(/status\/(\d+)/);
- return match ? match[1] : null;
+ const match=url.match(/status\/(\d+)/);
+ return match?match[1]:null;
 }
 
 function addError(card,message){
- const tip=document.createElement("p");
- tip.className="error";
- tip.textContent=message;
- card.appendChild(tip);
+ const p=document.createElement("p");
+ p.className="error";
+ p.textContent=message;
+ card.appendChild(p);
 }
 
-function createLink(url){
- const link=document.createElement("a");
- link.href=url;
- link.target="_blank";
- link.rel="noopener noreferrer";
- link.textContent="打开 / 下载媒体";
- return link;
+function addLink(card,url,text,download){
+ const a=document.createElement("a");
+ a.href=url;
+ a.target="_blank";
+ a.rel="noopener noreferrer";
+ a.className="action"+(download?" download":"");
+ a.textContent=text;
+
+ if(download){
+  a.setAttribute("download","");
+ }
+
+ card.appendChild(a);
+}
+
+function createVideoCard(card,item){
+ // 先显示封面，不立即加载视频
+ if(item.thumbnail){
+  const cover=document.createElement("img");
+  cover.src=item.thumbnail;
+  cover.alt="视频封面";
+  cover.loading="eager";
+
+  cover.onerror=()=>{
+   cover.style.display="none";
+   addError(card,"封面加载失败，可以直接打开视频");
+  };
+
+  card.appendChild(cover);
+ }else{
+  addError(card,"该视频没有提供封面");
+ }
+
+ // 点击后才创建播放器
+ const play=document.createElement("button");
+ play.textContent="▶ 播放视频";
+
+ play.onclick=()=>{
+  play.disabled=true;
+  play.textContent="正在加载视频...";
+
+  const video=document.createElement("video");
+  video.controls=true;
+  video.playsInline=true;
+  video.preload="metadata";
+  video.setAttribute("playsinline","");
+  video.style.width="100%";
+
+  if(item.thumbnail){
+   video.poster=item.thumbnail;
+  }
+
+  const source=document.createElement("source");
+  source.src=item.url;
+  source.type="video/mp4";
+  video.appendChild(source);
+
+  video.addEventListener("loadedmetadata",()=>{
+   play.textContent="视频已加载";
+  });
+
+  video.addEventListener("error",()=>{
+   play.textContent="重新尝试播放";
+   play.disabled=false;
+   addError(card,"网页播放器加载失败，请使用下面的打开视频按钮");
+   video.remove();
+  });
+
+  card.insertBefore(video,play);
+  play.remove();
+
+  video.load();
+  video.play().catch(()=>{
+   video.controls=true;
+  });
+ };
+
+ card.appendChild(play);
+
+ // 单独提供打开和下载入口
+ addLink(card,item.url,"打开视频",false);
+ addLink(card,item.url,"下载视频",true);
 }
 
 async function parseTweet(){
@@ -141,12 +218,12 @@ async function parseTweet(){
 
   const data=await response.json();
 
-  if(!response.ok || data.success===false){
-   throw new Error(data.error || "解析失败");
+  if(!response.ok||data.success===false){
+   throw new Error(data.error||"解析失败");
   }
 
-  if(!Array.isArray(data.media) || data.media.length===0){
-   throw new Error("没有找到可用的媒体文件");
+  if(!Array.isArray(data.media)||!data.media.length){
+   throw new Error("没有找到媒体文件");
   }
 
   data.media.forEach((item,index)=>{
@@ -160,51 +237,8 @@ async function parseTweet(){
    card.appendChild(title);
 
    if(item.type==="video"){
-
-    // 单独显示视频封面
-    if(item.thumbnail){
-     const cover=document.createElement("img");
-     cover.src=item.thumbnail;
-     cover.alt="视频封面";
-     cover.loading="eager";
-
-     cover.onerror=()=>{
-      cover.alt="封面加载失败";
-      addError(card,"封面图片加载失败");
-     };
-
-     card.appendChild(cover);
-    }
-
-    // 创建独立的视频播放器
-    const video=document.createElement("video");
-    video.controls=true;
-    video.playsInline=true;
-    video.preload="metadata";
-    video.setAttribute("playsinline","");
-    video.setAttribute("webkit-playsinline","");
-
-    // 视频源
-    const source=document.createElement("source");
-    source.src=item.url;
-    source.type="video/mp4";
-    video.appendChild(source);
-
-    video.addEventListener("error",()=>{
-     addError(card,"视频加载失败，请尝试直接打开视频链接");
-    });
-
-    video.addEventListener("loadedmetadata",()=>{
-     const info=document.createElement("p");
-     info.className="small";
-     info.textContent="视频时长："+Math.round(video.duration)+" 秒";
-     card.appendChild(info);
-    });
-
-    card.appendChild(video);
-
+    createVideoCard(card,item);
    }else{
-
     const img=document.createElement("img");
     img.src=item.url;
     img.alt="推文图片";
@@ -215,9 +249,9 @@ async function parseTweet(){
     };
 
     card.appendChild(img);
+    addLink(card,item.url,"打开 / 下载图片",true);
    }
 
-   card.appendChild(createLink(item.url));
    results.appendChild(card);
   });
 
@@ -270,12 +304,6 @@ function showHistory(){
 }
 
 showHistory();
-
-if("serviceWorker" in navigator){
- window.addEventListener("load",()=>{
-  navigator.serviceWorker.register("./sw.js").catch(console.error);
- });
-}
 </script>
 </body>
 </html>
