@@ -5,63 +5,96 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#111827">
-<title>X媒体助手</title>
+<title>X 媒体助手</title>
 
 <style>
 *{box-sizing:border-box}
 body{
- margin:0;background:#101522;color:white;
+ margin:0;
+ background:#101522;
+ color:white;
  font-family:Arial,sans-serif;
- min-height:100vh;padding:24px 16px;
+ min-height:100vh;
+ padding:24px 16px;
 }
 .container{max-width:520px;margin:auto}
 header{text-align:center;margin:35px 0}
-.logo{font-size:42px}
+.logo{font-size:46px}
 h1{font-size:28px;margin:10px}
 .sub{color:#9ca3af;font-size:14px}
 .panel{
- background:#1c2638;border-radius:18px;
- padding:20px;margin-top:22px;
+ background:#1c2638;
+ border-radius:18px;
+ padding:20px;
+ margin-top:22px;
 }
 input{
- width:100%;padding:16px;border-radius:12px;
- border:1px solid #3b4659;background:#101522;
- color:white;font-size:15px;outline:none;
+ width:100%;
+ padding:16px;
+ border-radius:12px;
+ border:1px solid #3b4659;
+ background:#101522;
+ color:white;
+ font-size:15px;
+ outline:none;
 }
 button{
- width:100%;padding:15px;border:0;
- border-radius:12px;font-size:16px;
- font-weight:bold;cursor:pointer;
- background:#7564ee;color:white;
+ width:100%;
+ padding:15px;
+ border:0;
+ border-radius:12px;
+ font-size:16px;
+ font-weight:bold;
+ cursor:pointer;
+ background:#7564ee;
+ color:white;
  margin-top:14px;
 }
 button:disabled{opacity:.5}
-#status{color:#c4b5fd;margin-top:15px;font-size:14px}
+#status{
+ color:#c4b5fd;
+ margin-top:15px;
+ font-size:14px;
+}
 .item{
- background:#263248;border-radius:12px;
- padding:12px;margin-top:15px;
+ background:#263248;
+ border-radius:12px;
+ padding:12px;
+ margin-top:15px;
  overflow:hidden;
 }
 .item img,.item video{
- width:100%;border-radius:10px;
+ width:100%;
+ border-radius:10px;
  display:block;
 }
-.item video{background:#000;margin-top:10px}
-.item a{
- color:#c4b5fd;display:inline-block;
- margin-top:12px;word-break:break-all;
+.item video{
+ background:#000;
+ margin-top:12px;
 }
+.item h4{margin:5px 0 12px}
 .action{
- display:block;text-align:center;
- text-decoration:none;border-radius:10px;
- padding:13px;margin-top:12px;
- background:#7564ee;color:white!important;
+ display:block;
+ width:100%;
+ text-align:center;
+ text-decoration:none;
+ border-radius:10px;
+ padding:13px;
+ margin-top:12px;
+ background:#7564ee;
+ color:white;
  font-weight:bold;
+ border:0;
 }
 .download{background:#35445e}
 .small{color:#9ca3af;font-size:12px}
 .error{color:#fca5a5;font-size:13px}
-footer{text-align:center;color:#697386;margin-top:35px;font-size:12px}
+footer{
+ text-align:center;
+ color:#697386;
+ margin-top:35px;
+ font-size:12px;
+}
 </style>
 </head>
 
@@ -69,27 +102,31 @@ footer{text-align:center;color:#697386;margin-top:35px;font-size:12px}
 <div class="container">
 
 <header>
-<div class="logo">𝕏 ↓</div>
-<h1>X 媒体助手</h1>
-<div class="sub">Twitter / X 图片和视频解析工具</div>
+ <div class="logo">𝕏 ↓</div>
+ <h1>X 媒体助手</h1>
+ <div class="sub">Twitter / X 图片和视频解析工具</div>
 </header>
 
 <div class="panel">
-<h3>粘贴推文链接</h3>
-<input id="tweetUrl"
- placeholder="https://x.com/user/status/123456789">
-<button id="parseBtn" onclick="parseTweet()">开始解析</button>
-<div id="status">支持公开推文链接</div>
+ <h3>粘贴推文链接</h3>
+ <input
+  id="tweetUrl"
+  type="url"
+  placeholder="https://x.com/user/status/123456789">
+ <button id="parseBtn" onclick="parseTweet()">开始解析</button>
+ <div id="status">支持公开推文链接</div>
 </div>
 
 <div id="results"></div>
 
 <div class="panel">
-<h3>最近解析</h3>
-<div id="history" class="small">暂无历史记录</div>
+ <h3>最近解析</h3>
+ <div id="history" class="small">暂无历史记录</div>
 </div>
 
-<footer>仅用于下载自己拥有或获准使用的媒体内容</footer>
+<footer>
+ 仅用于下载自己拥有或获准使用的媒体内容
+</footer>
 
 </div>
 
@@ -106,14 +143,14 @@ function getTweetId(url){
  return match?match[1]:null;
 }
 
-function addError(card,message){
+function showError(card,message){
  const p=document.createElement("p");
  p.className="error";
  p.textContent=message;
  card.appendChild(p);
 }
 
-function addLink(card,url,text,download){
+function addButton(card,url,text,download){
  const a=document.createElement("a");
  a.href=url;
  a.target="_blank";
@@ -122,14 +159,14 @@ function addLink(card,url,text,download){
  a.textContent=text;
 
  if(download){
-  a.setAttribute("download","");
+  a.setAttribute("download","x-video.mp4");
  }
 
  card.appendChild(a);
 }
 
 function createVideoCard(card,item){
- // 先显示封面，不立即加载视频
+ // 独立显示封面
  if(item.thumbnail){
   const cover=document.createElement("img");
   cover.src=item.thumbnail;
@@ -137,64 +174,99 @@ function createVideoCard(card,item){
   cover.loading="eager";
 
   cover.onerror=()=>{
-   cover.style.display="none";
-   addError(card,"封面加载失败，可以直接打开视频");
+   cover.alt="封面加载失败";
+   showError(card,"封面加载失败");
   };
 
   card.appendChild(cover);
  }else{
-  addError(card,"该视频没有提供封面");
+  showError(card,"没有获取到视频封面");
  }
 
- // 点击后才创建播放器
+ // 播放按钮
  const play=document.createElement("button");
- play.textContent="▶ 播放视频";
+ play.textContent="▶ 网页内播放";
 
  play.onclick=()=>{
+  if(play.disabled)return;
+
   play.disabled=true;
-  play.textContent="正在加载视频...";
+  play.textContent="正在加载...";
 
   const video=document.createElement("video");
   video.controls=true;
   video.playsInline=true;
   video.preload="metadata";
   video.setAttribute("playsinline","");
-  video.style.width="100%";
+  video.setAttribute("webkit-playsinline","");
 
   if(item.thumbnail){
    video.poster=item.thumbnail;
   }
 
   const source=document.createElement("source");
-  source.src=item.url;
+  source.src=item.playUrl || item.url;
   source.type="video/mp4";
   video.appendChild(source);
 
   video.addEventListener("loadedmetadata",()=>{
-   play.textContent="视频已加载";
+   play.remove();
   });
 
   video.addEventListener("error",()=>{
    play.textContent="重新尝试播放";
    play.disabled=false;
-   addError(card,"网页播放器加载失败，请使用下面的打开视频按钮");
+   showError(card,"网页播放失败，可以尝试打开视频");
    video.remove();
-  });
+  },{once:true});
 
   card.insertBefore(video,play);
-  play.remove();
-
   video.load();
+
   video.play().catch(()=>{
    video.controls=true;
+   play.textContent="点击播放器中央播放";
+   play.disabled=false;
   });
  };
 
  card.appendChild(play);
 
- // 单独提供打开和下载入口
- addLink(card,item.url,"打开视频",false);
- addLink(card,item.url,"下载视频",true);
+ // 打开视频
+ addButton(
+  card,
+  item.url,
+  "打开原始视频",
+  false
+ );
+
+ // 通过 Worker 下载
+ addButton(
+  card,
+  item.downloadUrl || item.url,
+  "⬇ 下载视频",
+  true
+ );
+}
+
+function createImageCard(card,item){
+ const img=document.createElement("img");
+ img.src=item.url;
+ img.alt="推文图片";
+ img.loading="lazy";
+
+ img.onerror=()=>{
+  showError(card,"图片加载失败");
+ };
+
+ card.appendChild(img);
+
+ addButton(
+  card,
+  item.url,
+  "打开 / 下载图片",
+  true
+ );
 }
 
 async function parseTweet(){
@@ -222,34 +294,47 @@ async function parseTweet(){
    throw new Error(data.error||"解析失败");
   }
 
-  if(!Array.isArray(data.media)||!data.media.length){
+  if(!Array.isArray(data.media)||data.media.length===0){
    throw new Error("没有找到媒体文件");
   }
 
+  // 显示作者信息
+  const info=document.createElement("div");
+  info.className="panel";
+
+  const author=document.createElement("div");
+  author.textContent=
+   (data.author||"")+
+   (data.username?" @"+data.username:"");
+
+  info.appendChild(author);
+
+  if(data.text){
+   const content=document.createElement("p");
+   content.className="small";
+   content.textContent=data.text;
+   info.appendChild(content);
+  }
+
+  results.appendChild(info);
+
+  // 显示媒体
   data.media.forEach((item,index)=>{
    const card=document.createElement("div");
    card.className="item";
 
    const title=document.createElement("h4");
-   title.textContent=item.type==="video"
+   title.textContent=
+    item.type==="video"||item.type==="gif"
     ?"视频 "+(index+1)
     :"图片 "+(index+1);
+
    card.appendChild(title);
 
-   if(item.type==="video"){
+   if(item.type==="video"||item.type==="gif"){
     createVideoCard(card,item);
    }else{
-    const img=document.createElement("img");
-    img.src=item.url;
-    img.alt="推文图片";
-    img.loading="lazy";
-
-    img.onerror=()=>{
-     addError(card,"图片加载失败");
-    };
-
-    card.appendChild(img);
-    addLink(card,item.url,"打开 / 下载图片",true);
+    createImageCard(card,item);
    }
 
    results.appendChild(card);
@@ -268,14 +353,24 @@ async function parseTweet(){
 }
 
 function saveHistory(url){
- let list=JSON.parse(localStorage.getItem("xHistory")||"[]");
- list=[url,...list.filter(x=>x!==url)].slice(0,8);
+ let list=JSON.parse(
+  localStorage.getItem("xHistory")||"[]"
+ );
+
+ list=[
+  url,
+  ...list.filter(x=>x!==url)
+ ].slice(0,8);
+
  localStorage.setItem("xHistory",JSON.stringify(list));
  showHistory();
 }
 
 function showHistory(){
- const list=JSON.parse(localStorage.getItem("xHistory")||"[]");
+ const list=JSON.parse(
+  localStorage.getItem("xHistory")||"[]"
+ );
+
  const box=document.getElementById("history");
  box.innerHTML="";
 
@@ -290,6 +385,7 @@ function showHistory(){
 
   const a=document.createElement("a");
   a.href="#";
+  a.className="action";
   a.textContent=url;
 
   a.onclick=e=>{
