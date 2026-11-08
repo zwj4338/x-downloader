@@ -115,6 +115,28 @@ button:disabled{opacity:.5}
  font-size:11px;
  margin-left:6px;
 }
+.history-row{
+ display:flex;
+ align-items:center;
+ gap:8px;
+}
+.history-row a{
+ flex:1;
+ min-width:0;
+ overflow-wrap:anywhere;
+}
+.delete-btn{
+ width:auto;
+ min-width:64px;
+ padding:10px;
+ margin:0;
+ background:#a33d50;
+ font-size:13px;
+}
+.clear-history{
+ background:#35445e;
+ margin-top:12px;
+}
 footer{
  text-align:center;
  color:#697386;
@@ -215,13 +237,13 @@ function createVideoCard(card,item){
   ?item.qualities.filter(q=>q&&q.playUrl&&q.downloadUrl)
   :[];
 
- // 兼容旧接口：没有 qualities 时使用原来的地址
  const options=qualities.length
   ?qualities
   :[{
     label:item.defaultQuality||"默认画质",
     width:item.width,
     height:item.height,
+    url:item.url,
     playUrl:item.playUrl||item.url,
     downloadUrl:item.downloadUrl||item.playUrl||item.url
    }];
@@ -252,7 +274,7 @@ function createVideoCard(card,item){
   showError(card,"视频加载失败，请检查网络或视频源");
  });
 
- // 播放画质
+ // 播放画质选择
  const playBox=document.createElement("div");
  playBox.className="quality-box";
 
@@ -275,7 +297,6 @@ function createVideoCard(card,item){
    (q.width&&q.height
     ?" · "+q.width+"×"+q.height
     :"");
-
   playSelect.appendChild(option);
  });
 
@@ -283,14 +304,14 @@ function createVideoCard(card,item){
 
  const playHint=document.createElement("div");
  playHint.className="quality-hint";
- playHint.textContent="切换后会重新加载视频，尽量保持播放进度";
+ playHint.textContent="切换画质会重新加载视频，尽量保持播放进度";
 
  playBox.appendChild(playTitle);
  playBox.appendChild(playSelect);
  playBox.appendChild(playHint);
  card.appendChild(playBox);
 
- // 下载画质
+ // 下载画质选择
  const downloadBox=document.createElement("div");
  downloadBox.className="quality-box";
 
@@ -313,7 +334,6 @@ function createVideoCard(card,item){
    (q.width&&q.height
     ?" · "+q.width+"×"+q.height
     :"");
-
   downloadSelect.appendChild(option);
  });
 
@@ -321,14 +341,14 @@ function createVideoCard(card,item){
 
  const downloadHint=document.createElement("div");
  downloadHint.className="quality-hint";
- downloadHint.textContent="下载画质和播放画质互不影响";
+ downloadHint.textContent="下载画质与播放画质互不影响";
 
  downloadBox.appendChild(downloadTitle);
  downloadBox.appendChild(downloadSelect);
  downloadBox.appendChild(downloadHint);
  card.appendChild(downloadBox);
 
- // 当前下载地址
+ // 下载按钮
  const downloadButton=addButton(
   card,
   best.downloadUrl,
@@ -336,7 +356,7 @@ function createVideoCard(card,item){
   true
  );
 
- // 当前播放画质切换
+ // 切换播放画质
  playSelect.addEventListener("change",()=>{
 
   const index=Number(playSelect.value);
@@ -371,7 +391,7 @@ function createVideoCard(card,item){
 
  });
 
- // 下载画质切换
+ // 切换下载画质
  downloadSelect.addEventListener("change",()=>{
 
   const index=Number(downloadSelect.value);
@@ -385,7 +405,7 @@ function createVideoCard(card,item){
 
  });
 
- // 打开当前播放画质原始视频
+ // 打开原始视频
  addButton(
   card,
   best.url||item.url,
@@ -393,7 +413,7 @@ function createVideoCard(card,item){
  );
 }
 
-// 图片
+// 图片解析
 function createImageCard(card,item){
 
  const img=document.createElement("img");
@@ -416,6 +436,7 @@ function createImageCard(card,item){
  );
 }
 
+// 开始解析
 async function parseTweet(){
 
  const url=input.value.trim();
@@ -505,6 +526,7 @@ async function parseTweet(){
  }
 }
 
+// 保存历史
 function saveHistory(url){
 
  let list=JSON.parse(
@@ -518,6 +540,119 @@ function saveHistory(url){
 
  localStorage.setItem("xHistory",JSON.stringify(list));
  showHistory();
+}
+
+// 单条删除：二次确认
+function deleteHistory(index){
+
+ const current=JSON.parse(
+  localStorage.getItem("xHistory")||"[]"
+ );
+
+ if(index<0||index>=current.length)return;
+
+ if(!confirm(
+  "第一次确认：确定要删除这条解析记录吗？"
+ )){
+  return;
+ }
+
+ if(!confirm(
+  "第二次确认：删除后无法恢复，真的要删除吗？"
+ )){
+  return;
+ }
+
+ current.splice(index,1);
+
+ localStorage.setItem(
+  "xHistory",
+  JSON.stringify(current)
+ );
+
+ showHistory();
+
+ alert("这条解析记录已删除！");
+}
+
+// 显示历史记录
+function showHistory(){
+
+ const list=JSON.parse(
+  localStorage.getItem("xHistory")||"[]"
+ );
+
+ const box=document.getElementById("history");
+ box.innerHTML="";
+
+ if(!list.length){
+  box.textContent="暂无历史记录";
+  return;
+ }
+
+ list.forEach((url,index)=>{
+
+  const row=document.createElement("div");
+  row.className="item history-row";
+
+  const a=document.createElement("a");
+  a.href="#";
+  a.className="action";
+  a.textContent=url;
+
+  a.onclick=e=>{
+   e.preventDefault();
+   input.value=url;
+   parseTweet();
+  };
+
+  const del=document.createElement("button");
+  del.className="delete-btn";
+  del.textContent="删除";
+
+  del.onclick=()=>{
+   deleteHistory(index);
+  };
+
+  row.appendChild(a);
+  row.appendChild(del);
+  box.appendChild(row);
+ });
+
+ // 清空全部历史
+ const clear=document.createElement("button");
+ clear.className="clear-history";
+ clear.textContent="清空全部历史";
+
+ clear.onclick=()=>{
+
+  if(!confirm(
+   "第一次确认：确定要删除全部解析记录吗？"
+  )){
+   return;
+  }
+
+  if(!confirm(
+   "第二次确认：删除后无法恢复，真的要全部清空吗？"
+  )){
+   return;
+  }
+
+  localStorage.removeItem("xHistory");
+
+  showHistory();
+
+  alert("全部解析记录已清空！");
+ };
+
+ box.appendChild(clear);
+}
+
+showHistory();
+</script>
+</body>
+</html>
+();
 }
 
 function showHistory(){
