@@ -90,6 +90,7 @@ button:disabled{opacity:.5}
 .download{background:#35445e}
 .small{color:#9ca3af;font-size:12px}
 .error{color:#fca5a5;font-size:13px}
+
 .quality-box{
  background:#1c2638;
  border-radius:12px;
@@ -115,15 +116,59 @@ button:disabled{opacity:.5}
  font-size:11px;
  margin-left:6px;
 }
+
+/* 贴文展开和收起 */
+.tweet-text{
+ white-space:pre-wrap;
+ overflow-wrap:anywhere;
+ line-height:1.7;
+ font-size:14px;
+ color:#e5e7eb;
+}
+.tweet-text.collapsed{
+ display:-webkit-box;
+ -webkit-box-orient:vertical;
+ -webkit-line-clamp:4;
+ line-clamp:4;
+ overflow:hidden;
+}
+.tweet-toggle{
+ display:inline-block;
+ width:auto;
+ padding:7px 12px;
+ margin-top:10px;
+ background:#35445e;
+ color:#c4b5fd;
+ font-size:13px;
+}
+
 .history-row{
  display:flex;
  align-items:center;
  gap:8px;
 }
-.history-row a{
- flex:1;
- min-width:0;
+.history-info{flex:1;min-width:0}
+.history-author{
+ font-weight:bold;
+ font-size:15px;
  overflow-wrap:anywhere;
+}
+.history-username{
+ color:#b9aaff;
+ font-size:13px;
+ margin-top:5px;
+}
+.history-url{
+ color:#9ca3af;
+ font-size:11px;
+ margin-top:6px;
+ overflow-wrap:anywhere;
+}
+.history-open{
+ background:#35445e;
+ padding:9px;
+ margin-top:9px;
+ font-size:13px;
 }
 .delete-btn{
  width:auto;
@@ -248,11 +293,9 @@ function createVideoCard(card,item){
     downloadUrl:item.downloadUrl||item.playUrl||item.url
    }];
 
- // 后端已按最高分辨率优先排列
  const best=options[0];
 
  const video=document.createElement("video");
-
  video.controls=true;
  video.playsInline=true;
  video.preload="metadata";
@@ -348,7 +391,6 @@ function createVideoCard(card,item){
  downloadBox.appendChild(downloadHint);
  card.appendChild(downloadBox);
 
- // 下载按钮
  const downloadButton=addButton(
   card,
   best.downloadUrl,
@@ -358,7 +400,6 @@ function createVideoCard(card,item){
 
  // 切换播放画质
  playSelect.addEventListener("change",()=>{
-
   const index=Number(playSelect.value);
   const selected=options[index];
 
@@ -368,7 +409,6 @@ function createVideoCard(card,item){
   const wasPlaying=!video.paused;
 
   video.pause();
-
   source.src=selected.playUrl;
   video.load();
 
@@ -388,24 +428,19 @@ function createVideoCard(card,item){
     video.play().catch(()=>{});
    }
   });
-
  });
 
  // 切换下载画质
  downloadSelect.addEventListener("change",()=>{
-
   const index=Number(downloadSelect.value);
   const selected=options[index];
 
   if(!selected)return;
 
   downloadButton.href=selected.downloadUrl;
-  downloadButton.textContent=
-   "⬇ 下载 "+qualityName(selected);
-
+  downloadButton.textContent="⬇ 下载 "+qualityName(selected);
  });
 
- // 打开原始视频
  addButton(
   card,
   best.url||item.url,
@@ -415,9 +450,7 @@ function createVideoCard(card,item){
 
 // 图片解析
 function createImageCard(card,item){
-
  const img=document.createElement("img");
-
  img.src=item.url;
  img.alt="推文图片";
  img.loading="lazy";
@@ -434,6 +467,42 @@ function createImageCard(card,item){
   "打开 / 下载图片",
   true
  );
+}
+
+// 贴文内容：默认折叠，点击展开或收起
+function createTweetText(container,text){
+
+ if(!text)return;
+
+ const textBox=document.createElement("div");
+ textBox.className="tweet-text collapsed";
+ textBox.textContent=text;
+
+ container.appendChild(textBox);
+
+ // 先临时显示完整内容，判断是否真的超过四行
+ textBox.classList.remove("collapsed");
+
+ requestAnimationFrame(()=>{
+  const isLong=textBox.scrollHeight>textBox.clientHeight+2;
+
+  if(!isLong){
+   return;
+  }
+
+  textBox.classList.add("collapsed");
+
+  const toggle=document.createElement("button");
+  toggle.className="tweet-toggle";
+  toggle.textContent="展开全文 ↓";
+
+  toggle.onclick=()=>{
+   const collapsed=textBox.classList.toggle("collapsed");
+   toggle.textContent=collapsed?"展开全文 ↓":"收起 ↑";
+  };
+
+  container.appendChild(toggle);
+ });
 }
 
 // 开始解析
@@ -468,22 +537,23 @@ async function parseTweet(){
    throw new Error("没有找到媒体文件");
   }
 
-  // 作者信息
+  // 作者和贴文信息
   const info=document.createElement("div");
   info.className="panel";
 
   const author=document.createElement("div");
   author.textContent=
-   (data.author||"")+
+   (data.author||"未知作者")+
    (data.username?" @"+data.username:"");
 
   info.appendChild(author);
 
   if(data.text){
-   const content=document.createElement("p");
-   content.className="small";
-   content.textContent=data.text;
-   info.appendChild(content);
+   const contentTitle=document.createElement("h4");
+   contentTitle.textContent="贴文内容";
+   info.appendChild(contentTitle);
+
+   createTweetText(info,data.text);
   }
 
   results.appendChild(info);
@@ -515,7 +585,11 @@ async function parseTweet(){
   statusBox.textContent=
    "解析成功，共找到 "+data.media.length+" 个媒体文件";
 
-  saveHistory(url);
+  saveHistory(
+   url,
+   data.author||"未知作者",
+   data.username||""
+  );
 
  }catch(error){
 
@@ -526,19 +600,30 @@ async function parseTweet(){
  }
 }
 
-// 保存历史
-function saveHistory(url){
+// 保存历史记录，兼容旧版记录
+function saveHistory(url,author,username){
 
  let list=JSON.parse(
   localStorage.getItem("xHistory")||"[]"
  );
 
+ list=list.map(item=>{
+  if(typeof item==="string"){
+   return {url:item,author:"",username:""};
+  }
+  return item;
+ });
+
  list=[
-  url,
-  ...list.filter(x=>x!==url)
+  {url,author,username},
+  ...list.filter(item=>item.url!==url)
  ].slice(0,8);
 
- localStorage.setItem("xHistory",JSON.stringify(list));
+ localStorage.setItem(
+  "xHistory",
+  JSON.stringify(list)
+ );
+
  showHistory();
 }
 
@@ -578,9 +663,16 @@ function deleteHistory(index){
 // 显示历史记录
 function showHistory(){
 
- const list=JSON.parse(
+ let list=JSON.parse(
   localStorage.getItem("xHistory")||"[]"
  );
+
+ list=list.map(item=>{
+  if(typeof item==="string"){
+   return {url:item,author:"",username:""};
+  }
+  return item;
+ });
 
  const box=document.getElementById("history");
  box.innerHTML="";
@@ -590,21 +682,41 @@ function showHistory(){
   return;
  }
 
- list.forEach((url,index)=>{
+ list.forEach((item,index)=>{
 
   const row=document.createElement("div");
   row.className="item history-row";
 
-  const a=document.createElement("a");
-  a.href="#";
-  a.className="action";
-  a.textContent=url;
+  const info=document.createElement("div");
+  info.className="history-info";
 
-  a.onclick=e=>{
-   e.preventDefault();
-   input.value=url;
+  const author=document.createElement("div");
+  author.className="history-author";
+  author.textContent=item.author||"作者信息未记录";
+
+  const username=document.createElement("div");
+  username.className="history-username";
+  username.textContent=item.username
+   ?"@"+item.username
+   :"暂无作者 ID";
+
+  const url=document.createElement("div");
+  url.className="history-url";
+  url.textContent=item.url;
+
+  const open=document.createElement("button");
+  open.className="history-open";
+  open.textContent="重新解析";
+
+  open.onclick=()=>{
+   input.value=item.url;
    parseTweet();
   };
+
+  info.appendChild(author);
+  info.appendChild(username);
+  info.appendChild(url);
+  info.appendChild(open);
 
   const del=document.createElement("button");
   del.className="delete-btn";
@@ -614,7 +726,7 @@ function showHistory(){
    deleteHistory(index);
   };
 
-  row.appendChild(a);
+  row.appendChild(info);
   row.appendChild(del);
   box.appendChild(row);
  });
