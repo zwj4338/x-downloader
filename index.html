@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#111827">
-<title>X 媒体助手</title>
+<title>X Downloader</title>
 
 <style>
 *{box-sizing:border-box}
@@ -63,16 +63,16 @@ button:disabled{opacity:.5}
  margin-top:15px;
  overflow:hidden;
 }
-.item img,.item video{
+.item video,.item img{
  width:100%;
- border-radius:10px;
  display:block;
+ border-radius:10px;
+ background:#000;
 }
 .item video{
- background:#000;
- margin-top:12px;
+ aspect-ratio:9/16;
+ object-fit:contain;
 }
-.item h4{margin:5px 0 12px}
 .action{
  display:block;
  width:100%;
@@ -103,15 +103,13 @@ footer{
 
 <header>
  <div class="logo">𝕏 ↓</div>
- <h1>X 媒体助手</h1>
+ <h1>X Downloader</h1>
  <div class="sub">Twitter / X 图片和视频解析工具</div>
 </header>
 
 <div class="panel">
  <h3>粘贴推文链接</h3>
- <input
-  id="tweetUrl"
-  type="url"
+ <input id="tweetUrl"
   placeholder="https://x.com/user/status/123456789">
  <button id="parseBtn" onclick="parseTweet()">开始解析</button>
  <div id="status">支持公开推文链接</div>
@@ -125,7 +123,7 @@ footer{
 </div>
 
 <footer>
- 仅用于下载自己拥有或获准使用的媒体内容
+仅用于下载自己拥有或获准使用的媒体内容
 </footer>
 
 </div>
@@ -150,7 +148,7 @@ function showError(card,message){
  card.appendChild(p);
 }
 
-function addButton(card,url,text,download){
+function addButton(card,url,text,download=false){
  const a=document.createElement("a");
  a.href=url;
  a.target="_blank";
@@ -159,98 +157,59 @@ function addButton(card,url,text,download){
  a.textContent=text;
 
  if(download){
-  a.setAttribute("download","x-video.mp4");
+  a.download="x-video.mp4";
  }
 
  card.appendChild(a);
 }
 
+// 视频：封面只放在播放器内部，不单独显示
 function createVideoCard(card,item){
- // 独立显示封面
+
+ const video=document.createElement("video");
+
+ video.controls=true;
+ video.playsInline=true;
+ video.preload="metadata";
+ video.setAttribute("playsinline","");
+ video.setAttribute("webkit-playsinline","");
+
+ // 封面只作为播放器预览
  if(item.thumbnail){
-  const cover=document.createElement("img");
-  cover.src=item.thumbnail;
-  cover.alt="视频封面";
-  cover.loading="eager";
-
-  cover.onerror=()=>{
-   cover.alt="封面加载失败";
-   showError(card,"封面加载失败");
-  };
-
-  card.appendChild(cover);
- }else{
-  showError(card,"没有获取到视频封面");
+  video.poster=item.thumbnail;
  }
 
- // 播放按钮
- const play=document.createElement("button");
- play.textContent="▶ 网页内播放";
+ const source=document.createElement("source");
+ source.src=item.playUrl||item.url;
+ source.type="video/mp4";
 
- play.onclick=()=>{
-  if(play.disabled)return;
+ video.appendChild(source);
+ card.appendChild(video);
 
-  play.disabled=true;
-  play.textContent="正在加载...";
+ video.addEventListener("error",()=>{
+  showError(card,"视频加载失败，请检查网络或视频源");
+ });
 
-  const video=document.createElement("video");
-  video.controls=true;
-  video.playsInline=true;
-  video.preload="metadata";
-  video.setAttribute("playsinline","");
-  video.setAttribute("webkit-playsinline","");
-
-  if(item.thumbnail){
-   video.poster=item.thumbnail;
-  }
-
-  const source=document.createElement("source");
-  source.src=item.playUrl || item.url;
-  source.type="video/mp4";
-  video.appendChild(source);
-
-  video.addEventListener("loadedmetadata",()=>{
-   play.remove();
-  });
-
-  video.addEventListener("error",()=>{
-   play.textContent="重新尝试播放";
-   play.disabled=false;
-   showError(card,"网页播放失败，可以尝试打开视频");
-   video.remove();
-  },{once:true});
-
-  card.insertBefore(video,play);
-  video.load();
-
-  video.play().catch(()=>{
-   video.controls=true;
-   play.textContent="点击播放器中央播放";
-   play.disabled=false;
-  });
- };
-
- card.appendChild(play);
-
- // 打开视频
+ // 打开原始视频
  addButton(
   card,
   item.url,
-  "打开原始视频",
-  false
+  "打开原始视频"
  );
 
- // 通过 Worker 下载
+ // 下载视频
  addButton(
   card,
-  item.downloadUrl || item.url,
+  item.downloadUrl||item.playUrl||item.url,
   "⬇ 下载视频",
   true
  );
 }
 
+// 图片
 function createImageCard(card,item){
  const img=document.createElement("img");
+
  img.src=item.url;
  img.alt="推文图片";
  img.loading="lazy";
@@ -270,6 +229,7 @@ function createImageCard(card,item){
 }
 
 async function parseTweet(){
+
  const url=input.value.trim();
  const id=getTweetId(url);
 
@@ -284,6 +244,7 @@ async function parseTweet(){
  statusBox.textContent="正在解析，请稍候...";
 
  try{
+
   const response=await fetch(
    API_URL+"?id="+encodeURIComponent(id)
   );
@@ -298,7 +259,7 @@ async function parseTweet(){
    throw new Error("没有找到媒体文件");
   }
 
-  // 显示作者信息
+  // 作者信息
   const info=document.createElement("div");
   info.className="panel";
 
@@ -318,12 +279,14 @@ async function parseTweet(){
 
   results.appendChild(info);
 
-  // 显示媒体
+  // 媒体内容
   data.media.forEach((item,index)=>{
+
    const card=document.createElement("div");
    card.className="item";
 
    const title=document.createElement("h4");
+
    title.textContent=
     item.type==="video"||item.type==="gif"
     ?"视频 "+(index+1)
@@ -346,13 +309,16 @@ async function parseTweet(){
   saveHistory(url);
 
  }catch(error){
+
   statusBox.textContent="解析失败："+error.message;
+
  }finally{
   btn.disabled=false;
  }
 }
 
 function saveHistory(url){
+
  let list=JSON.parse(
   localStorage.getItem("xHistory")||"[]"
  );
@@ -367,6 +333,7 @@ function saveHistory(url){
 }
 
 function showHistory(){
+
  const list=JSON.parse(
   localStorage.getItem("xHistory")||"[]"
  );
@@ -380,6 +347,7 @@ function showHistory(){
  }
 
  list.forEach(url=>{
+
   const row=document.createElement("div");
   row.className="item";
 
