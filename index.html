@@ -41,14 +41,22 @@ button:disabled{opacity:.5}
 .item{
  background:#263248;border-radius:12px;
  padding:12px;margin-top:15px;
+ overflow:hidden;
 }
 .item img,.item video{
  width:100%;border-radius:10px;
  display:block;
 }
-.item video{background:#000}
-.item a{color:#c4b5fd;display:inline-block;margin-top:10px}
+.item video{
+ background:#000;
+ margin-top:10px;
+}
+.item a{
+ color:#c4b5fd;display:inline-block;
+ margin-top:10px;word-break:break-all;
+}
 .small{color:#9ca3af;font-size:12px}
+.error{color:#fca5a5;font-size:13px}
 footer{text-align:center;color:#697386;margin-top:35px;font-size:12px}
 </style>
 </head>
@@ -96,135 +104,163 @@ function getTweetId(url){
  return match ? match[1] : null;
 }
 
-async function parseTweet(){
- const url = input.value.trim();
- const id = getTweetId(url);
+function addError(card,message){
+ const tip=document.createElement("p");
+ tip.className="error";
+ tip.textContent=message;
+ card.appendChild(tip);
+}
 
- results.innerHTML = "";
+function createLink(url){
+ const link=document.createElement("a");
+ link.href=url;
+ link.target="_blank";
+ link.rel="noopener noreferrer";
+ link.textContent="打开 / 下载媒体";
+ return link;
+}
+
+async function parseTweet(){
+ const url=input.value.trim();
+ const id=getTweetId(url);
+
+ results.innerHTML="";
 
  if(!id){
-  statusBox.textContent = "请输入正确的 X 推文链接";
+  statusBox.textContent="请输入正确的 X 推文链接";
   return;
  }
 
- btn.disabled = true;
- statusBox.textContent = "正在解析，请稍候...";
+ btn.disabled=true;
+ statusBox.textContent="正在解析，请稍候...";
 
  try{
-  const response = await fetch(
-   API_URL + "?id=" + encodeURIComponent(id)
+  const response=await fetch(
+   API_URL+"?id="+encodeURIComponent(id)
   );
 
-  const data = await response.json();
+  const data=await response.json();
 
-  if(!response.ok){
+  if(!response.ok || data.success===false){
    throw new Error(data.error || "解析失败");
   }
 
-  if(!data.media || data.media.length === 0){
+  if(!Array.isArray(data.media) || data.media.length===0){
    throw new Error("没有找到可用的媒体文件");
   }
 
   data.media.forEach((item,index)=>{
-   const card = document.createElement("div");
-   card.className = "item";
+   const card=document.createElement("div");
+   card.className="item";
 
-   const title = document.createElement("h4");
-   title.textContent = item.type === "video"
-    ? "视频 " + (index+1)
-    : "图片 " + (index+1);
-
+   const title=document.createElement("h4");
+   title.textContent=item.type==="video"
+    ?"视频 "+(index+1)
+    :"图片 "+(index+1);
    card.appendChild(title);
 
-   if(item.type === "video"){
-    const video = document.createElement("video");
+   if(item.type==="video"){
 
-    // 视频地址
-    video.src = item.url;
-
-    // 视频封面地址
+    // 单独显示视频封面
     if(item.thumbnail){
-     video.poster = item.thumbnail;
+     const cover=document.createElement("img");
+     cover.src=item.thumbnail;
+     cover.alt="视频封面";
+     cover.loading="eager";
+
+     cover.onerror=()=>{
+      cover.alt="封面加载失败";
+      addError(card,"封面图片加载失败");
+     };
+
+     card.appendChild(cover);
     }
 
-    // 播放器设置
-    video.controls = true;
-    video.playsInline = true;
-    video.preload = "metadata";
+    // 创建独立的视频播放器
+    const video=document.createElement("video");
+    video.controls=true;
+    video.playsInline=true;
+    video.preload="metadata";
+    video.setAttribute("playsinline","");
+    video.setAttribute("webkit-playsinline","");
 
-    video.style.width = "100%";
-    video.style.display = "block";
-    video.style.borderRadius = "10px";
-    video.style.background = "#000";
+    // 视频源
+    const source=document.createElement("source");
+    source.src=item.url;
+    source.type="video/mp4";
+    video.appendChild(source);
 
     video.addEventListener("error",()=>{
-     const tip = document.createElement("p");
-     tip.className = "small";
-     tip.textContent = "视频加载失败，请检查视频链接或网络";
-     card.appendChild(tip);
+     addError(card,"视频加载失败，请尝试直接打开视频链接");
+    });
+
+    video.addEventListener("loadedmetadata",()=>{
+     const info=document.createElement("p");
+     info.className="small";
+     info.textContent="视频时长："+Math.round(video.duration)+" 秒";
+     card.appendChild(info);
     });
 
     card.appendChild(video);
 
    }else{
-    const img = document.createElement("img");
-    img.src = item.url;
-    img.alt = "推文图片";
-    img.loading = "lazy";
+
+    const img=document.createElement("img");
+    img.src=item.url;
+    img.alt="推文图片";
+    img.loading="lazy";
+
+    img.onerror=()=>{
+     addError(card,"图片加载失败");
+    };
+
     card.appendChild(img);
    }
 
-   const link = document.createElement("a");
-   link.href = item.url;
-   link.target = "_blank";
-   link.rel = "noopener noreferrer";
-   link.textContent = "打开 / 下载媒体";
-
-   card.appendChild(link);
+   card.appendChild(createLink(item.url));
    results.appendChild(card);
   });
 
-  statusBox.textContent =
-   "解析成功，共找到 " + data.media.length + " 个媒体文件";
+  statusBox.textContent=
+   "解析成功，共找到 "+data.media.length+" 个媒体文件";
 
   saveHistory(url);
 
  }catch(error){
-  statusBox.textContent = "解析失败：" + error.message;
+  statusBox.textContent="解析失败："+error.message;
  }finally{
-  btn.disabled = false;
+  btn.disabled=false;
  }
 }
 
 function saveHistory(url){
- let list = JSON.parse(localStorage.getItem("xHistory") || "[]");
- list = [url,...list.filter(x=>x!==url)].slice(0,8);
+ let list=JSON.parse(localStorage.getItem("xHistory")||"[]");
+ list=[url,...list.filter(x=>x!==url)].slice(0,8);
  localStorage.setItem("xHistory",JSON.stringify(list));
  showHistory();
 }
 
 function showHistory(){
- const list = JSON.parse(localStorage.getItem("xHistory") || "[]");
- const box = document.getElementById("history");
-
- box.innerHTML = "";
+ const list=JSON.parse(localStorage.getItem("xHistory")||"[]");
+ const box=document.getElementById("history");
+ box.innerHTML="";
 
  if(!list.length){
-  box.textContent = "暂无历史记录";
+  box.textContent="暂无历史记录";
   return;
  }
 
  list.forEach(url=>{
-  const row = document.createElement("div");
-  row.className = "item";
+  const row=document.createElement("div");
+  row.className="item";
 
-  const a = document.createElement("a");
-  a.href = "#";
-  a.textContent = url;
+  const a=document.createElement("a");
+  a.href="#";
+  a.textContent=url;
 
-  a.onclick = e=>{
+  a.onclick=e=>{
    e.preventDefault();
-   input.value = url;
+   input.value=url;
    parseTweet();
   };
 
