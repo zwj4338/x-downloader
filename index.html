@@ -28,9 +28,9 @@ h1{font-size:28px;margin:10px}
  padding:20px;
  margin-top:22px;
 }
-input{
+input,select{
  width:100%;
- padding:16px;
+ padding:15px;
  border-radius:12px;
  border:1px solid #3b4659;
  background:#101522;
@@ -38,6 +38,7 @@ input{
  font-size:15px;
  outline:none;
 }
+select{margin-top:8px}
 button{
  width:100%;
  padding:15px;
@@ -89,6 +90,31 @@ button:disabled{opacity:.5}
 .download{background:#35445e}
 .small{color:#9ca3af;font-size:12px}
 .error{color:#fca5a5;font-size:13px}
+.quality-box{
+ background:#1c2638;
+ border-radius:12px;
+ padding:13px;
+ margin-top:13px;
+}
+.quality-title{
+ font-size:13px;
+ color:#c4b5fd;
+ font-weight:bold;
+}
+.quality-hint{
+ color:#9ca3af;
+ font-size:11px;
+ margin-top:6px;
+}
+.quality-badge{
+ display:inline-block;
+ padding:4px 8px;
+ border-radius:7px;
+ background:#3d356d;
+ color:#d8d0ff;
+ font-size:11px;
+ margin-left:6px;
+}
 footer{
  text-align:center;
  color:#697386;
@@ -161,10 +187,47 @@ function addButton(card,url,text,download=false){
  }
 
  card.appendChild(a);
+ return a;
 }
 
-// 视频：封面只放在播放器内部，不单独显示
+// 画质名称
+function qualityName(q){
+ if(q.label)return q.label;
+
+ const longest=Math.max(
+  Number(q.width)||0,
+  Number(q.height)||0
+ );
+
+ if(longest>=3000)return "4K";
+ if(longest>=2000)return "2K";
+ if(longest>=1800)return "1080P";
+ if(longest>=1100)return "720P";
+ if(longest>=700)return "480P";
+
+ return longest?longest+"P":"原始画质";
+}
+
+// 视频播放器和画质选择
 function createVideoCard(card,item){
+
+ const qualities=Array.isArray(item.qualities)
+  ?item.qualities.filter(q=>q&&q.playUrl&&q.downloadUrl)
+  :[];
+
+ // 兼容旧接口：没有 qualities 时使用原来的地址
+ const options=qualities.length
+  ?qualities
+  :[{
+    label:item.defaultQuality||"默认画质",
+    width:item.width,
+    height:item.height,
+    playUrl:item.playUrl||item.url,
+    downloadUrl:item.downloadUrl||item.playUrl||item.url
+   }];
+
+ // 后端已按最高分辨率优先排列
+ const best=options[0];
 
  const video=document.createElement("video");
 
@@ -174,13 +237,12 @@ function createVideoCard(card,item){
  video.setAttribute("playsinline","");
  video.setAttribute("webkit-playsinline","");
 
- // 封面只作为播放器预览
  if(item.thumbnail){
   video.poster=item.thumbnail;
  }
 
  const source=document.createElement("source");
- source.src=item.playUrl||item.url;
+ source.src=best.playUrl;
  source.type="video/mp4";
 
  video.appendChild(source);
@@ -190,24 +252,150 @@ function createVideoCard(card,item){
   showError(card,"视频加载失败，请检查网络或视频源");
  });
 
- // 打开原始视频
- addButton(
+ // 播放画质
+ const playBox=document.createElement("div");
+ playBox.className="quality-box";
+
+ const playTitle=document.createElement("div");
+ playTitle.className="quality-title";
+ playTitle.textContent="▶ 播放画质";
+
+ const playBadge=document.createElement("span");
+ playBadge.className="quality-badge";
+ playBadge.textContent="默认最高";
+ playTitle.appendChild(playBadge);
+
+ const playSelect=document.createElement("select");
+
+ options.forEach((q,index)=>{
+  const option=document.createElement("option");
+  option.value=String(index);
+  option.textContent=
+   qualityName(q)+
+   (q.width&&q.height
+    ?" · "+q.width+"×"+q.height
+    :"");
+
+  playSelect.appendChild(option);
+ });
+
+ playSelect.value="0";
+
+ const playHint=document.createElement("div");
+ playHint.className="quality-hint";
+ playHint.textContent="切换后会重新加载视频，尽量保持播放进度";
+
+ playBox.appendChild(playTitle);
+ playBox.appendChild(playSelect);
+ playBox.appendChild(playHint);
+ card.appendChild(playBox);
+
+ // 下载画质
+ const downloadBox=document.createElement("div");
+ downloadBox.className="quality-box";
+
+ const downloadTitle=document.createElement("div");
+ downloadTitle.className="quality-title";
+ downloadTitle.textContent="⬇ 下载画质";
+
+ const downloadBadge=document.createElement("span");
+ downloadBadge.className="quality-badge";
+ downloadBadge.textContent="默认最高";
+ downloadTitle.appendChild(downloadBadge);
+
+ const downloadSelect=document.createElement("select");
+
+ options.forEach((q,index)=>{
+  const option=document.createElement("option");
+  option.value=String(index);
+  option.textContent=
+   qualityName(q)+
+   (q.width&&q.height
+    ?" · "+q.width+"×"+q.height
+    :"");
+
+  downloadSelect.appendChild(option);
+ });
+
+ downloadSelect.value="0";
+
+ const downloadHint=document.createElement("div");
+ downloadHint.className="quality-hint";
+ downloadHint.textContent="下载画质和播放画质互不影响";
+
+ downloadBox.appendChild(downloadTitle);
+ downloadBox.appendChild(downloadSelect);
+ downloadBox.appendChild(downloadHint);
+ card.appendChild(downloadBox);
+
+ // 当前下载地址
+ const downloadButton=addButton(
   card,
-  item.url,
-  "打开原始视频"
+  best.downloadUrl,
+  "⬇ 下载 "+qualityName(best),
+  true
  );
 
- // 下载视频
+ // 当前播放画质切换
+ playSelect.addEventListener("change",()=>{
+
+  const index=Number(playSelect.value);
+  const selected=options[index];
+
+  if(!selected)return;
+
+  const oldTime=video.currentTime||0;
+  const wasPlaying=!video.paused;
+
+  video.pause();
+
+  source.src=selected.playUrl;
+  video.load();
+
+  video.addEventListener("loadedmetadata",function restore(){
+   video.removeEventListener("loadedmetadata",restore);
+
+   if(Number.isFinite(oldTime)&&oldTime>0){
+    try{
+     video.currentTime=Math.min(
+      oldTime,
+      video.duration||oldTime
+     );
+    }catch(e){}
+   }
+
+   if(wasPlaying){
+    video.play().catch(()=>{});
+   }
+  });
+
+ });
+
+ // 下载画质切换
+ downloadSelect.addEventListener("change",()=>{
+
+  const index=Number(downloadSelect.value);
+  const selected=options[index];
+
+  if(!selected)return;
+
+  downloadButton.href=selected.downloadUrl;
+  downloadButton.textContent=
+   "⬇ 下载 "+qualityName(selected);
+
+ });
+
+ // 打开当前播放画质原始视频
  addButton(
   card,
-  item.downloadUrl||item.playUrl||item.url,
-  "⬇ 下载视频",
-  true
+  best.url||item.url,
+  "打开原始视频"
  );
 }
 
 // 图片
 function createImageCard(card,item){
+
  const img=document.createElement("img");
 
  img.src=item.url;
